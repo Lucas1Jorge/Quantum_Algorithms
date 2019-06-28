@@ -1,73 +1,96 @@
 // small modification on Google Quantum Computing Playground base code for Shor's Integer Factorization algorithm
 
-proc FindFactors N
-  x = 0
-
-  if N < 15
-    Print "Invalid number!"
+proc Factorize N
+  // the minimum semiprime number considered is 3 * 5 = 15
+  if N < 15 
+    Print "The semiprime is too small. Try another number."
     Breakpoint
   endif
 
-  width = QMath.getWidth(N)
-  twidth = 2 * width + 3
+  // the method getWidth return the number
+  // of bits needed to store N
+  N_bits = QMath.getWidth(N)
+  total_bits = 2 * N_bits + 3
 
-  for x; (QMath.gcd(N, x) > 1) || (x < 2); x
-    x = Math.floor(Math.random() * 10000) % N // the initial 'bad guess' g
+  // create the initial random guess for a factor
+  g = 0
+  for g; (QMath.gcd(N, g) > 1) || (g < 2); g
+    g = Math.floor(Math.random() * 10000) % N
   endfor
 
-  Print "Random seed: " + x
+  Print "Initial guess: " + g
 
-  for i = 0; i < twidth; i++
-    Hadamard i // create a superposition state in the i-th digit
+  // create a superposition of states in each
+  // digit using the Hadamard transform
+  for i = 0; i < total_bits; i++
+    Hadamard i
+  endfor
+	
+  // calculates g^N (mod total_bits)
+  ExpModN g, N, total_bits
+
+  // measuring bits cause the superposition to colapse into
+  // only the inputs correspondednt to the measured output
+  for i = 0; i < N_bits; i++
+    MeasureBit total_bits + i
   endfor
 
-  ExpModN x, N, twidth
+  // the reversed of the QFT will turn the p-spaced periodic
+  // superposition in the input into the 1/p frequency in the output
+  InvQFT 0, total_bits
 
-  for i = 0; i < width; i++
-    MeasureBit twidth + i
+  // inverse the digits, since the output
+  // in last step was in reversed order
+  for i = 0; i < total_bits / 2; i++
+    Swap i, total_bits - i - 1
   endfor
 
-  InvQFT 0, twidth
-
-  for i = 0; i < twidth / 2; i++
-    Swap i, twidth - i - 1
-  endfor
-
-  for trycnt = 100; trycnt >= 0; trycnt--
+  // as explained along the theory, the initial guess might be a bad
+  // value, with 3/8 chance of being a good choice. Then, it is very
+  // likely that the correct resul is achieved within the first 10 trials
+  for trials = 100; trials >= 0; trials--
     Measure
     c = measured_value
 
-    if c == 0
-      Print "Measured zero, try again."
-      continue
-    endif
+    // if c == 0
+    //  Print "Measured zero, try again."
+    //  continue
+    // endif
 
-    q = 1 << width
+    p = 1 << N_bits
+		Print c
+    Print p
+    Print "Measured " + c + " (" + c / p + ")"
 
-    Print "Measured " + c + " (" + c / q + ")"
-
-    tmp = QMath.fracApprox(c, q, width)
+    tmp = QMath.fracApprox(c, p, N_bits)
 
     c = tmp[0];
-    q = tmp[1];
+    p = tmp[1];
 
-    Print "fractional approximation is " + c + "/" + q
+    Print "fractional approximation is " + c + "/" + p
 
-    if (q % 2 == 1) && (2 * q < (1 << width))
+    // after the QFT, the measurement is in the frequency domain, and
+    // we wish that the denominator corresponds to de period
+    if (p % 2 == 1) && (2 * p < (1 << N_bits))
       Print "Odd denominator, trying to expand by 2."
-      q *= 2
+      p *= 2
     endif
 
-    if q % 2 == 1
+    // of the denominator is odd and can't be multiplied by 2 in N_bits,
+    // then we had a bad guess g and should repeat the algorithm
+    if p % 2 == 1
       Print "Odd period, try again."
       continue
     endif
 
-    Print "Possible period is " + q
+    Print "Possible period is " + p
 
-    a = QMath.ipow(x, q / 2) + 1 % N
-    b = QMath.ipow(x, q / 2) - 1 % N
+    // if the period is even, we can calculate g^(p/2) +- 1
+    // to get good guesses for factors of N
+    a = QMath.ipow(g, p / 2) + 1 % N
+    b = QMath.ipow(g, p / 2) - 1 % N
 
+    // a and b might not be factors of N, but share factor with N
     a = QMath.gcd(N, a)
     b = QMath.gcd(N, b)
 
@@ -87,5 +110,5 @@ proc FindFactors N
   endfor
 endproc
 
-VectorSize 16
-FindFactors 39
+VectorSize 16 // this should not exceed 22, the number of qubits in the simulator
+Factorize 39
