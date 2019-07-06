@@ -1,14 +1,8 @@
-// small modification on Google Quantum Computing Playground base code for Shor's Integer Factorization algorithm
+VectorSize 16 // this should not exceed 22, the number of qubits in the simulator
 
 proc Factorize N
-  // the minimum semiprime number considered is 3 * 5 = 15
-  if N < 15 
-    Print "The semiprime is too small. Try another number."
-    Breakpoint
-  endif
-
   // the method getWidth return the number
-  // of bits needed to store N
+  // of qubits needed to store N
   N_bits = QMath.getWidth(N)
   total_bits = 2 * N_bits + 3
 
@@ -25,12 +19,16 @@ proc Factorize N
   for i = 0; i < total_bits; i++
     Hadamard i
   endfor
-	
-  // calculates g^N (mod total_bits)
+  
+  // calculates g^total_bits (N)
   ExpModN g, N, total_bits
 
   // measuring bits cause the superposition to colapse into
   // only the inputs correspondednt to the measured output
+
+  // since we took the modulo N in the previous step, we
+  // only need to measure up to N_bits, since all numbers
+  // modulo N will be in range from 0 to N.
   for i = 0; i < N_bits; i++
     MeasureBit total_bits + i
   endfor
@@ -47,18 +45,13 @@ proc Factorize N
 
   // as explained along the theory, the initial guess might be a bad
   // value, with 3/8 chance of being a good choice. Then, it is very
-  // likely that the correct resul is achieved within the first 10 trials
+  // likely that the correct result is achieved within the first 10 trials
   for trials = 100; trials >= 0; trials--
     Measure
     c = measured_value
 
-    // if c == 0
-    //  Print "Measured zero, try again."
-    //  continue
-    // endif
-
     p = 1 << N_bits
-		Print c
+    Print c
     Print p
     Print "Measured " + c + " (" + c / p + ")"
 
@@ -76,7 +69,7 @@ proc Factorize N
       p *= 2
     endif
 
-    // of the denominator is odd and can't be multiplied by 2 in N_bits,
+    // if the denominator is odd and can't be multiplied by 2 in N_bits,
     // then we had a bad guess g and should repeat the algorithm
     if p % 2 == 1
       Print "Odd period, try again."
@@ -101,14 +94,14 @@ proc Factorize N
     endif
 
     if (factor < N) && (factor > 1)
-      Display "<h2>Success: " + factor + " " + N / factor
+      Display "<h2>Factorization: " + factor + " " + N / factor
       Breakpoint
     else
-      Print "Unable to determine factors, try again."
+      Print "Unable to Factorize. Please try again."
       continue
     endif
   endfor
 endproc
 
-VectorSize 16 // this should not exceed 22, the number of qubits in the simulator
 Factorize 39
+
